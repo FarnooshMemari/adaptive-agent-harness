@@ -1,13 +1,13 @@
 """
 scripts/harness_mcp_server.py — MCP server for the Adaptive Agent Harness.
 
-Exposes three tools that AI agents (threat-analyst, evaluation-reviewer) can
+Exposes four tools that AI agents (threat-analyst, evaluation-reviewer) can
 call directly from chat without having to read and parse raw files manually:
 
   list_alerts          — list all alerts with id, category, severity, verdict
   get_alert            — fetch one alert's full content by alert_id
   query_results        — summarise benchmark_combined.jsonl by strategy/category
-  get_strategy_summary — per-strategy accuracy, score, cost from a results file
+  get_strategy_summary — per-alert selector choice vs. the higher-scoring strategy
 
 Run standalone (for testing):
     python3.12 scripts/harness_mcp_server.py
@@ -33,6 +33,15 @@ from mcp.server.mcpserver import MCPServer
 _ALERTS_FILE  = os.path.join(ROOT, "data", "sample_alerts.json")
 _RESULTS_DIR  = os.path.join(ROOT, "experiments", "results")
 _DEFAULT_RESULTS = os.path.join(_RESULTS_DIR, "benchmark_combined.jsonl")
+
+
+def _attach_categories(records: list) -> list:
+    """Result records omit category; look it up from the alert file (as evaluate.py does)."""
+    with open(_ALERTS_FILE) as f:
+        cats = {a["alert_id"]: a.get("category") or a.get("type") for a in json.load(f)}
+    for r in records:
+        r.setdefault("category", cats.get(r.get("alert_id")))
+    return records
 
 
 # ── server definition ─────────────────────────────────────────────────────────
@@ -193,7 +202,7 @@ def query_results(
 
     try:
         with open(path) as f:
-            records = [json.loads(line) for line in f if line.strip()]
+            records = _attach_categories([json.loads(line) for line in f if line.strip()])
     except FileNotFoundError:
         return (
             f"ERROR: {path} not found.\n"
@@ -295,7 +304,7 @@ def get_strategy_summary(results_file: str = "") -> str:
 
     try:
         with open(path) as f:
-            records = [json.loads(line) for line in f if line.strip()]
+            records = _attach_categories([json.loads(line) for line in f if line.strip()])
     except FileNotFoundError:
         return f"ERROR: {path} not found."
 
