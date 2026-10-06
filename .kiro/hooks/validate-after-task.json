@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Validate Pipeline After Task",
+      "trigger": "PostTaskExec",
+      "description": "Runs after a spec task completes. Executes the full test suite and then checks that every alert in sample_alerts.json has a corresponding entry in mock_responses.json. Catches dataset/mock drift that would cause silent failures during benchmark runs.",
+      "action": {
+        "type": "command",
+        "command": "cd \"$(dirname \"$0\")/../..\" && python3 -m pytest tests/ -q 2>&1 | tail -5 && echo \"---\" && python3 -c \"\nimport json, sys\nalerts = json.load(open('data/sample_alerts.json'))\nmocks  = json.load(open('data/mock_responses.json'))\nalert_ids = {a['alert_id'] for a in alerts}\nmock_ids  = {k for k in mocks if not k.startswith('_')}\nmissing   = alert_ids - mock_ids\nif missing:\n    print('FAIL: alerts missing from mock_responses.json:', sorted(missing))\n    sys.exit(1)\nprint(f'OK: {len(alert_ids)} alerts, {len(mock_ids)} mock entries, no gaps')\n\"",
+        "timeout": 90
+      }
+    }
+  ]
+}

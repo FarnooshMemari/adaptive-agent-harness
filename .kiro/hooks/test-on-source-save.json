@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run Tests on Source Save",
+      "trigger": "PostFileSave",
+      "description": "Runs the full pytest suite whenever a file inside harness/ or strategies/ is saved. Uses -x to stop on first failure so the error is immediately visible. Output is trimmed to the last 20 lines to keep the notification readable.",
+      "matcher": "harness/.*\\.py$|strategies/.*\\.py$",
+      "action": {
+        "type": "command",
+        "command": "cd \"$(dirname \"$0\")/../..\" && python3 -m pytest tests/ -x -q 2>&1 | tail -20",
+        "timeout": 60
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "harness": {
+      "command": "/Users/far/miniforge3/bin/python3.12",
+      "args": ["scripts/harness_mcp_server.py"],
+      "env": {},
+      "disabled": false,
+      "description": "Exposes benchmark alert data and evaluation results as queryable MCP tools. Requires benchmark_combined.jsonl — run: python experiments/run_benchmark.py --alert data/sample_alerts.json --compare-all"
+    }
+  }
+}
