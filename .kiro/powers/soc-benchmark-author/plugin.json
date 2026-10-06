@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "soc-benchmark-author",
+  "version": "1.0.0",
+  "description": "Extend the Adaptive Agent Harness security-alert benchmark safely: author labelled alerts plus deterministic mock responses for both strategies, then validate schema, mock coverage, and the expected panel-vs-hierarchical outcome before running the benchmark.",
+  "author": {
+    "name": "Farnoosh Memari"
+  },
+  "keywords": [
+    "benchmark alert",
+    "new alert",
+    "sample_alerts",
+    "mock_responses",
+    "ground truth",
+    "preferred_strategy",
+    "credential_compromise",
+    "suspicious_access",
+    "malware_like_behavior",
+    "privilege_escalation"
+  ],
+  "repository": "https://github.com/FarnooshMemari/adaptive-agent-harness"
+}
