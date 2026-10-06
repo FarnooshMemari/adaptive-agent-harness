@@ -82,12 +82,15 @@ class _RecordingClient(BaseLLMClient):
     """Wraps a client and records every prompt sent to it."""
 
     def __init__(self, inner: BaseLLMClient) -> None:
-        self.inner   = inner
-        self.prompts = []
+        self.inner     = inner
+        self.prompts   = []
+        self.responses = []
 
     def invoke(self, system: str, user: str) -> LLMResponse:
         self.prompts.append(system + "\n" + user)
-        return self.inner.invoke(system, user)
+        resp = self.inner.invoke(system, user)
+        self.responses.append(resp.text)
+        return resp
 
 
 @pytest.mark.parametrize("strategy_cls,key", [(PanelStrategy, PANEL), (HierarchicalStrategy, HIER)])
@@ -99,6 +102,32 @@ def test_prompts_never_contain_ground_truth(alerts, strategy_cls, key):
             assert "ground_truth" not in prompt
             assert "preferred_strategy" not in prompt
             assert a.ground_truth["expected_mitigation"] not in prompt
+
+
+# ─── Mock role routing ────────────────────────────────────────────────────────
+
+def test_hierarchical_threat_intel_not_routed_to_panel_role():
+    # The hierarchical Threat Intel prompt contains the panel keyword
+    # "threat intelligence analyst"; it must still resolve to its own role.
+    from strategies.hierarchical import _THREAT_INTEL_SYSTEM
+    assert MockLLMClient("ALT-001", HIER)._detect_role(_THREAT_INTEL_SYSTEM) == "threat_intel_finding"
+
+
+_ROLE_ORDER = {
+    PANEL: ["threat_assessment", "forensics_assessment", "critic_report", "consensus"],
+    HIER:  ["evidence_validation", "decomposition", "network_finding",
+            "threat_intel_finding", "synthesis"],
+}
+
+
+@pytest.mark.parametrize("strategy_cls,key", [(PanelStrategy, PANEL), (HierarchicalStrategy, HIER)])
+def test_every_agent_gets_its_own_mock_response(alerts, strategy_cls, key):
+    with open("data/mock_responses.json", encoding="utf-8") as fh:
+        mocks = json.load(fh)
+    for a in alerts:
+        client = _RecordingClient(MockLLMClient(a.alert_id, key))
+        strategy_cls(client).investigate(a)
+        assert client.responses == [mocks[a.alert_id][key][r] for r in _ROLE_ORDER[key]], a.alert_id
 
 
 # ─── Benchmark outcomes ───────────────────────────────────────────────────────

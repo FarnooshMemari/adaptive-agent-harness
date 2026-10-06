@@ -48,13 +48,28 @@ python experiments/run_benchmark.py --alert data/sample_alerts.json --compare-al
 python evaluate.py --results experiments/results/benchmark_combined.jsonl
 ```
 
+## Interactive demo
+
+```bash
+python demo/server.py          # then open http://localhost:8000  (--port to change)
+```
+
+1. Pick an alert, either from the four featured cards or from the dropdown of all 40.
+2. Click **Run analysis**. Both teams investigate live: the Debate Team (panel) and the Hierarchical Team. Click any finished agent to see its full output.
+3. Each team's decision is graded against the answer key.
+4. **Why this strategy?** shows the selector's signals and rules, with the first matching rule highlighted.
+5. **Selected strategy** shows the chosen team's metrics and whether it was the better choice.
+6. **Benchmark** shows real numbers from `experiments/results/benchmark_combined.jsonl`.
+
+The demo calls the real `StrategySelector`, `PanelStrategy`, and `HierarchicalStrategy`, and computes benchmark numbers with `evaluate.py`'s helpers. It uses `LLM_BACKEND` from `.env` (default `mock`), so no AWS credentials are needed. It needs nothing beyond `requirements.txt`, and there's no build step.
+
 ## Tests
 
 ```bash
 python -m pytest tests/ -q
 ```
 
-This runs 21 tests: the benchmark and selector unit tests in `tests/test_benchmark.py`, plus the Hypothesis property tests in `tests/test_properties.py`.
+This runs 24 tests: the benchmark, selector, and mock-routing tests in `tests/test_benchmark.py`, plus the Hypothesis property tests in `tests/test_properties.py`.
 
 ## Benchmark results
 

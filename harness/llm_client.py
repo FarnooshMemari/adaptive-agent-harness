@@ -93,6 +93,13 @@ _HIER_ROLE_KEYWORDS = {
     "synthesis":             "final determination",
 }
 
+# Roles are only matched within the client's own strategy, so a keyword shared
+# across strategies (e.g. "threat intelligence analyst") cannot cross-match.
+_ROLE_KEYWORDS = {
+    "panel_strategy":        _PANEL_ROLE_KEYWORDS,
+    "hierarchical_strategy": _HIER_ROLE_KEYWORDS,
+}
+
 
 class MockLLMClient(BaseLLMClient):
     """
@@ -160,20 +167,15 @@ class MockLLMClient(BaseLLMClient):
             )
         return strategy_responses
 
-    @staticmethod
-    def _detect_role(system: str) -> str:
+    def _detect_role(self, system: str) -> str:
         """
-        Identify the agent role from the system prompt text.
-        Checks panel keywords first, then hierarchical keywords.
+        Identify the agent role from the system prompt text, using only the
+        keywords of this client's strategy.
         Falls back to 'unknown' if no match found.
         """
         lower = system.lower()
 
-        for role, keyword in _PANEL_ROLE_KEYWORDS.items():
-            if keyword in lower:
-                return role
-
-        for role, keyword in _HIER_ROLE_KEYWORDS.items():
+        for role, keyword in _ROLE_KEYWORDS.get(self.strategy, {}).items():
             if keyword in lower:
                 return role
 
