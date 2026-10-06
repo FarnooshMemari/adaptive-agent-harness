@@ -50,6 +50,12 @@ python evaluate.py --results experiments/results/benchmark_combined.jsonl
 
 ## Interactive demo
 
+**Live:** https://farnooshmemari.github.io/adaptive-agent-harness/
+
+On every push to `main`, `.github/workflows/pages.yml` runs the tests and `demo/build_static.py`, then deploys the result to GitHub Pages. The build runs the real selector and both strategies with the mock backend for all 40 alerts, so the public page shows the same outputs as the local server.
+
+Run it locally:
+
 ```bash
 python demo/server.py          # then open http://localhost:8000  (--port to change)
 ```

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo-mode" content="live">
 <title>Adaptive Agent Harness</title>
 <style>
 :root {
@@ -285,8 +286,13 @@ const fx = (x, d = 2) => x == null ? "—" : Number(x).toFixed(d);
 
 let state = { alerts: [], selected: null, running: false, bench: null };
 
+// "static": served as files built by demo/build_static.py (no Python server behind the page).
+const STATIC = document.querySelector('meta[name="demo-mode"]').content === "static";
+
 async function api(path, body) {
-  const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const res = STATIC
+    ? await fetch(path === "/api/run" ? `api/run/${encodeURIComponent(body.alert_id)}.json` : `${path.slice(1)}.json`)
+    : await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;

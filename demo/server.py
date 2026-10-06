@@ -17,6 +17,8 @@ Standard library only — run from the repository root:
 
     python demo/server.py            # then open http://localhost:8000
     python demo/server.py --port 8080
+
+For a public static build (GitHub Pages), see demo/build_static.py.
 """
 
 import argparse
@@ -262,9 +264,12 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Adaptive Agent Harness web demo")
-    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"),
+                   help="Bind address (use 0.0.0.0 when hosting; env HOST).")
+    p.add_argument("--port", type=int, default=int(os.getenv("PORT", "8000")),
+                   help="Port (env PORT).")
     args = p.parse_args()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Adaptive Agent Harness demo → http://localhost:{args.port}  (LLM backend: {config.LLM_BACKEND})")
     try:
         server.serve_forever()
